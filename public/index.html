@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CTSCAN — Crypto Twitter Scanner</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+  <style>
+    :root {
+      --bg:      #0d0f14;
+      --surface: #161a24;
+      --border:  #252b3b;
+      --accent:  #3b82f6;
+      --green:   #22c55e;
+      --yellow:  #f59e0b;
+      --red:     #ef4444;
+      --muted:   #6b7280;
+      --text:    #e2e8f0;
+    }
+
+    * { box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', 'Segoe UI', sans-serif; }
+
+    /* Nav */
+    .topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px;
+              display: flex; align-items: center; justify-content: space-between; }
+    .logo   { font-weight: 700; font-size: 1.15rem; letter-spacing: .5px; color: var(--accent); }
+    .logo span { color: var(--text); }
+
+    /* Stat cards */
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+                 padding: 18px 22px; }
+    .stat-card .label  { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+    .stat-card .value  { font-size: 2rem; font-weight: 700; line-height: 1.1; }
+    .stat-card .sub    { font-size: .78rem; color: var(--muted); margin-top: 2px; }
+
+    /* Category pills / tabs */
+    .cat-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0; }
+    .cat-tab  { border: 1px solid var(--border); border-radius: 20px; padding: 5px 14px;
+                font-size: .82rem; cursor: pointer; background: transparent; color: var(--muted);
+                transition: all .15s; white-space: nowrap; }
+    .cat-tab:hover   { border-color: var(--accent); color: var(--text); }
+    .cat-tab.active  { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+
+    /* Category badge colours */
+    .badge-memecoin_kol { background: #7c3aed22; color: #a78bfa; border: 1px solid #7c3aed55; }
+    .badge-btc_maxi     { background: #d9770622; color: #fbbf24; border: 1px solid #d9770655; }
+    .badge-defi         { background: #0d948022; color: #34d399; border: 1px solid #0d948055; }
+    .badge-nft          { background: #be185d22; color: #f472b6; border: 1px solid #be185d55; }
+    .badge-trader       { background: #0369a122; color: #38bdf8; border: 1px solid #0369a155; }
+    .badge-builder      { background: #15803d22; color: #86efac; border: 1px solid #15803d55; }
+    .badge-general      { background: #37415122; color: #9ca3af; border: 1px solid #37415155; }
+
+    .cat-badge { display: inline-block; border-radius: 4px; padding: 2px 7px;
+                 font-size: .7rem; font-weight: 600; margin: 1px; }
+
+    /* Table */
+    .accounts-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+    .accounts-table th { background: var(--surface); border-bottom: 1px solid var(--border);
+                         padding: 10px 14px; color: var(--muted); font-weight: 600;
+                         text-transform: uppercase; font-size: .72rem; letter-spacing: .6px; }
+    .accounts-table td { border-bottom: 1px solid var(--border); padding: 10px 14px; vertical-align: middle; }
+    .accounts-table tr:hover td { background: #ffffff05; }
+    .accounts-table a { color: var(--accent); text-decoration: none; }
+    .accounts-table a:hover { text-decoration: underline; }
+
+    /* Scan panel */
+    .scan-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+    .log-box    { background: #080a0f; border: 1px solid var(--border); border-radius: 6px;
+                  height: 260px; overflow-y: auto; padding: 10px 14px;
+                  font-family: 'Fira Code', 'Cascadia Code', monospace; font-size: .78rem;
+                  color: #a3b4c8; line-height: 1.55; }
+    .log-box .log-new  { color: var(--green); }
+    .log-box .log-upd  { color: #60a5fa; }
+    .log-box .log-err  { color: var(--red); }
+    .log-box .log-head { color: #c084fc; font-weight: 600; }
+    .log-box .log-done { color: var(--green); font-weight: 600; }
+
+    /* Progress bar */
+    .progress-wrap { background: var(--border); border-radius: 4px; height: 6px; overflow: hidden; }
+    .progress-bar  { background: var(--accent); height: 100%; transition: width .3s; border-radius: 4px; }
+
+    /* Misc */
+    .section-title { font-size: .85rem; font-weight: 700; text-transform: uppercase;
+                     letter-spacing: .8px; color: var(--muted); margin-bottom: 14px; }
+    .search-input  { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+                     color: var(--text); padding: 8px 14px; width: 100%; font-size: .875rem; }
+    .search-input:focus { outline: none; border-color: var(--accent); }
+    .btn-accent { background: var(--accent); color: #fff; border: none; border-radius: 8px;
+                  padding: 9px 22px; font-weight: 600; cursor: pointer; font-size: .875rem; }
+    .btn-accent:hover    { opacity: .88; }
+    .btn-accent:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text);
+                   border-radius: 8px; padding: 7px 16px; font-size: .875rem; cursor: pointer; }
+    .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+    .sort-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: .72rem;
+                padding: 0 4px; }
+    .sort-btn.active { color: var(--accent); }
+    .pagination { display: flex; gap: 6px; align-items: center; justify-content: center; margin-top: 16px; }
+    .page-btn   { background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+                  padding: 5px 12px; color: var(--text); cursor: pointer; font-size: .82rem; }
+    .page-btn:hover    { border-color: var(--accent); }
+    .page-btn.active   { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .page-btn:disabled { opacity: .35; cursor: not-allowed; }
+    .spinner { width: 14px; height: 14px; border: 2px solid #ffffff33;
+               border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite;
+               display: inline-block; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .hide-mobile { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<nav class="topbar">
+  <div class="logo">CT<span>SCAN</span></div>
+  <div style="font-size:.8rem;color:var(--muted);" id="db-summary">Loading…</div>
+</nav>
+
+<div style="max-width:1400px;margin:0 auto;padding:24px 20px;">
+
+  <!-- Stats row -->
+  <div class="row g-3 mb-4" id="stats-row">
+    <div class="col-6 col-md-3"><div class="stat-card">
+      <div class="label">Total Accounts</div>
+      <div class="value text-primary" id="s-total">—</div>
+    </div></div>
+    <div class="col-6 col-md-3"><div class="stat-card">
+      <div class="label">Memecoin KOLs</div>
+      <div class="value" style="color:#a78bfa" id="s-memecoin">—</div>
+    </div></div>
+    <div class="col-6 col-md-3"><div class="stat-card">
+      <div class="label">Traders / TA</div>
+      <div class="value" style="color:#38bdf8" id="s-trader">—</div>
+    </div></div>
+    <div class="col-6 col-md-3"><div class="stat-card">
+      <div class="label">Tweets Recorded</div>
+      <div class="value" style="color:var(--green)" id="s-tweets">—</div>
+    </div></div>
+  </div>
+
+  <!-- Category breakdown pills -->
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-md-4 col-lg-3"><div class="stat-card" style="padding:12px 18px;">
+      <div class="label mb-2">Category Breakdown</div>
+      <div id="cat-breakdown" style="font-size:.82rem;"></div>
+    </div></div>
+
+    <!-- Scan panel -->
+    <div class="col-12 col-md-8 col-lg-9">
+      <div class="scan-panel">
+        <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+          <div class="section-title mb-0">Scanner</div>
+          <div class="d-flex gap-2 align-items-center flex-wrap">
+            <label style="font-size:.8rem;color:var(--muted);">Pages / query:</label>
+            <input type="number" id="scan-pages" value="5" min="1" max="50"
+              style="width:62px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:.82rem;" />
+            <button class="btn-accent" id="scan-btn" onclick="startScan()">Start Scan</button>
+            <div id="scan-status-badge" style="font-size:.78rem;color:var(--muted);"></div>
+          </div>
+        </div>
+
+        <div class="progress-wrap mb-3">
+          <div class="progress-bar" id="scan-progress-bar" style="width:0%"></div>
+        </div>
+
+        <div class="log-box" id="log-box">
+          <span style="color:var(--muted);">Start a scan to see live output…</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Accounts table -->
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;">
+
+    <!-- Controls -->
+    <div class="d-flex gap-2 align-items-center flex-wrap mb-3">
+      <div class="section-title mb-0" style="flex:none;">Accounts</div>
+      <input type="text" class="search-input" placeholder="Search username, name, bio…"
+        id="search-input" style="max-width:260px;" oninput="debounceSearch()" />
+      <div style="margin-left:auto;display:flex;gap:8px;">
+        <select id="sort-select" onchange="loadAccounts(1)"
+          style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 12px;font-size:.82rem;">
+          <option value="followers">Sort: Followers</option>
+          <option value="views">Sort: Views</option>
+          <option value="first_seen">Sort: Newest</option>
+        </select>
+        <button class="btn-outline" onclick="exportData()" title="Export current filter to .txt">Export</button>
+      </div>
+    </div>
+
+    <!-- Category filter tabs -->
+    <div class="cat-tabs" id="cat-tabs">
+      <button class="cat-tab active" data-cat="all" onclick="selectCat(this)">All</button>
+      <button class="cat-tab" data-cat="memecoin_kol" onclick="selectCat(this)">🪙 Memecoin KOLs</button>
+      <button class="cat-tab" data-cat="btc_maxi"     onclick="selectCat(this)">₿ BTC Maxis</button>
+      <button class="cat-tab" data-cat="defi"         onclick="selectCat(this)">🏦 DeFi</button>
+      <button class="cat-tab" data-cat="nft"          onclick="selectCat(this)">🖼 NFT</button>
+      <button class="cat-tab" data-cat="trader"       onclick="selectCat(this)">📈 Traders / TA</button>
+      <button class="cat-tab" data-cat="builder"      onclick="selectCat(this)">🔨 Builders</button>
+      <button class="cat-tab" data-cat="general"      onclick="selectCat(this)">🌐 General</button>
+    </div>
+
+    <!-- Table -->
+    <div style="overflow-x:auto;">
+      <table class="accounts-table">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Display Name</th>
+            <th>Categories</th>
+            <th style="text-align:right;">Followers</th>
+            <th style="text-align:right;" class="hide-mobile">Max Views</th>
+            <th class="hide-mobile">Hit Reason</th>
+            <th class="hide-mobile">First Seen</th>
+          </tr>
+        </thead>
+        <tbody id="accounts-tbody">
+          <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination" id="pagination"></div>
+    <div style="text-align:center;font-size:.78rem;color:var(--muted);margin-top:8px;" id="result-info"></div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let currentCat  = 'all';
+let currentPage = 1;
+let searchTimer = null;
+let scanEvents  = null;
+let logFirstRun = true;
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function fmt(n) { return Number(n ?? 0).toLocaleString(); }
+
+function catBadge(cat) {
+  const labels = {
+    memecoin_kol: 'Memecoin KOL',
+    btc_maxi:     'BTC Maxi',
+    defi:         'DeFi',
+    nft:          'NFT',
+    trader:       'Trader / TA',
+    builder:      'Builder',
+    general:      'General',
+  };
+  return `<span class="cat-badge badge-${cat}">${labels[cat] ?? cat}</span>`;
+}
+
+function timeAgo(iso) {
+  if (!iso) return '—';
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (d < 60)   return `${d}s ago`;
+  if (d < 3600) return `${Math.floor(d/60)}m ago`;
+  if (d < 86400)return `${Math.floor(d/3600)}h ago`;
+  return `${Math.floor(d/86400)}d ago`;
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const s = await fetch('/api/stats').then(r => r.json());
+    document.getElementById('s-total').textContent   = fmt(s.totalAccounts);
+    document.getElementById('s-memecoin').textContent= fmt(s.categories?.memecoin_kol);
+    document.getElementById('s-trader').textContent  = fmt(s.categories?.trader);
+    document.getElementById('s-tweets').textContent  = fmt(s.totalTweets);
+    document.getElementById('db-summary').textContent=
+      `${fmt(s.totalAccounts)} accounts · ${fmt(s.totalTweets)} tweets · ${fmt(s.totalQueries)} queries run`;
+
+    const cats = s.categories ?? {};
+    const order = [
+      ['memecoin_kol','🪙 Memecoin KOLs','#a78bfa'],
+      ['btc_maxi',    '₿ BTC Maxis',     '#fbbf24'],
+      ['defi',        '🏦 DeFi',         '#34d399'],
+      ['nft',         '🖼 NFT',          '#f472b6'],
+      ['trader',      '📈 Traders',      '#38bdf8'],
+      ['builder',     '🔨 Builders',     '#86efac'],
+      ['general',     '🌐 General',      '#9ca3af'],
+    ];
+    document.getElementById('cat-breakdown').innerHTML = order.map(([k,l,c]) =>
+      `<div style="display:flex;justify-content:space-between;margin-bottom:5px;">
+        <span style="color:${c}">${l}</span>
+        <span style="font-weight:700">${fmt(cats[k] ?? 0)}</span>
+      </div>`
+    ).join('');
+  } catch(e) { console.error('stats:', e); }
+}
+
+// ── Accounts table ─────────────────────────────────────────────────────────
+async function loadAccounts(page = 1) {
+  currentPage = page;
+  const cat    = currentCat;
+  const search = document.getElementById('search-input').value.trim();
+  const sort   = document.getElementById('sort-select').value;
+
+  const params = new URLSearchParams({ page, limit: 50, sort });
+  if (cat && cat !== 'all') params.set('category', cat);
+  if (search) params.set('search', search);
+
+  const tbody = document.getElementById('accounts-tbody');
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;">Loading…</td></tr>';
+
+  try {
+    const res  = await fetch(`/api/accounts?${params}`).then(r => r.json());
+    const rows = res.data ?? [];
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;">No accounts found.</td></tr>';
+      document.getElementById('pagination').innerHTML = '';
+      document.getElementById('result-info').textContent = '';
+      return;
+    }
+
+    tbody.innerHTML = rows.map(acc => `
+      <tr>
+        <td><a href="https://x.com/${acc.username}" target="_blank" rel="noopener">@${acc.username}</a></td>
+        <td style="color:var(--muted)">${acc.display_name || '—'}</td>
+        <td>${(acc.categories || []).map(catBadge).join('')}</td>
+        <td style="text-align:right;font-weight:700">${fmt(acc.followers)}</td>
+        <td style="text-align:right;" class="hide-mobile">${fmt(acc.max_views)}</td>
+        <td class="hide-mobile" style="font-size:.78rem;color:var(--muted)">${acc.hit_reason || '—'}</td>
+        <td class="hide-mobile" style="font-size:.78rem;color:var(--muted)">${timeAgo(acc.first_seen)}</td>
+      </tr>
+    `).join('');
+
+    // Pagination
+    renderPagination(res.page, res.pages, res.total);
+    document.getElementById('result-info').textContent =
+      `Showing ${((page-1)*50)+1}–${Math.min(page*50, res.total)} of ${fmt(res.total)} accounts`;
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red);padding:20px;">${e}</td></tr>`;
+  }
+}
+
+function renderPagination(page, pages, total) {
+  const el = document.getElementById('pagination');
+  if (pages <= 1) { el.innerHTML = ''; return; }
+
+  let html = `<button class="page-btn" onclick="loadAccounts(${page-1})" ${page<=1?'disabled':''}>‹</button>`;
+
+  let start = Math.max(1, page - 2);
+  let end   = Math.min(pages, start + 4);
+  start = Math.max(1, end - 4);
+
+  if (start > 1) html += `<button class="page-btn" onclick="loadAccounts(1)">1</button><span style="color:var(--muted);padding:0 4px">…</span>`;
+  for (let i = start; i <= end; i++) {
+    html += `<button class="page-btn ${i===page?'active':''}" onclick="loadAccounts(${i})">${i}</button>`;
+  }
+  if (end < pages) html += `<span style="color:var(--muted);padding:0 4px">…</span><button class="page-btn" onclick="loadAccounts(${pages})">${pages}</button>`;
+  html += `<button class="page-btn" onclick="loadAccounts(${page+1})" ${page>=pages?'disabled':''}>›</button>`;
+
+  el.innerHTML = html;
+}
+
+function selectCat(btn) {
+  document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentCat = btn.dataset.cat;
+  loadAccounts(1);
+}
+
+function debounceSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => loadAccounts(1), 350);
+}
+
+// ── Export ─────────────────────────────────────────────────────────────────
+function exportData() {
+  const cat = currentCat !== 'all' ? `&category=${currentCat}` : '';
+  window.open(`/api/export?${cat}`, '_blank');
+}
+
+// ── Scan ───────────────────────────────────────────────────────────────────
+async function startScan() {
+  const btn   = document.getElementById('scan-btn');
+  const pages = parseInt(document.getElementById('scan-pages').value, 10) || 5;
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Starting…';
+
+  const res = await fetch('/api/scan', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pages }),
+  });
+  const data = await res.json();
+
+  if (!res.ok) {
+    alert(data.error ?? 'Failed to start scan');
+    btn.disabled = false;
+    btn.textContent = 'Start Scan';
+    return;
+  }
+
+  connectScanEvents();
+}
+
+function connectScanEvents() {
+  if (scanEvents) { scanEvents.close(); }
+
+  const logBox = document.getElementById('log-box');
+  if (logFirstRun) { logBox.innerHTML = ''; logFirstRun = false; }
+
+  scanEvents = new EventSource('/api/scan/events');
+
+  scanEvents.onmessage = (e) => {
+    const line = JSON.parse(e.data);
+    const div = document.createElement('div');
+
+    if      (line.startsWith('[NEW]'))  div.className = 'log-new';
+    else if (line.startsWith('[UPD]'))  div.className = 'log-upd';
+    else if (line.includes('[ERROR]') || line.includes('[FATAL]')) div.className = 'log-err';
+    else if (line.startsWith('==='))    div.className = 'log-done';
+    else if (line.startsWith('───'))    div.className = 'log-head';
+
+    div.textContent = line;
+    logBox.appendChild(div);
+    logBox.scrollTop = logBox.scrollHeight;
+  };
+
+  // Poll status to update UI
+  const poll = setInterval(async () => {
+    try {
+      const s = await fetch('/api/scan/status').then(r => r.json());
+      const pct = s.totalQueries > 0
+        ? Math.round((s.queryIndex / s.totalQueries) * 100) : 0;
+      document.getElementById('scan-progress-bar').style.width = pct + '%';
+      document.getElementById('scan-status-badge').textContent =
+        s.running
+          ? `${s.queryIndex}/${s.totalQueries} queries · ${fmt(s.totalHits)} hits`
+          : s.finishedAt ? `Done · ${fmt(s.totalHits)} hits` : '';
+
+      if (!s.running) {
+        clearInterval(poll);
+        const btn = document.getElementById('scan-btn');
+        btn.disabled = false;
+        btn.textContent = 'Start Scan';
+        if (scanEvents) { scanEvents.close(); scanEvents = null; }
+        // Refresh stats + table
+        await loadStats();
+        await loadAccounts(1);
+      }
+    } catch {}
+  }, 2000);
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+(async () => {
+  await loadStats();
+  await loadAccounts(1);
+
+  // If a scan is already running (page reload), reconnect
+  const status = await fetch('/api/scan/status').then(r => r.json());
+  if (status.running) {
+    logFirstRun = false;
+    document.getElementById('log-box').innerHTML = '';
+    document.getElementById('scan-btn').disabled = true;
+    document.getElementById('scan-btn').innerHTML = '<span class="spinner"></span>Scanning…';
+    connectScanEvents();
+  }
+
+  // Auto-refresh stats every 30s
+  setInterval(loadStats, 30_000);
+})();
+</script>
+</body>
+</html>

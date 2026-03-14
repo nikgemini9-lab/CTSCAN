@@ -1,6 +1,21 @@
-# CTSCAN — Crypto Twitter Account Scanner
+# CTSCAN — Crypto Twitter Scanner
 
-Builds a growing SQLite database of Crypto Twitter accounts by searching Twitter/X using **[Rettiwt-API](https://github.com/Rishikant181/Rettiwt-API)** — no official Twitter API key required.
+Web dashboard that builds a searchable database of Crypto Twitter accounts using **[Rettiwt-API](https://github.com/Rishikant181/Rettiwt-API)** — no official Twitter API key required.
+
+## Features
+
+- **Auto-categorisation** — accounts tagged by niche from tweet content:
+  - 🪙 **Memecoin KOL** — posts contract addresses, pump.fun, dexscreener, #100x gems
+  - ₿ **BTC Maxi** — #bitcoin, #sats, hodl, lightning, stack sats
+  - 🏦 **DeFi** — yield, TVL, liquidity pools, protocols
+  - 🖼 **NFT** — floor prices, mints, collections
+  - 📈 **Trader / TA** — charts, signals, support/resistance, long/short
+  - 🔨 **Builder** — shipping products, smart contracts, DAOs
+  - 🌐 **General** — broader CT
+- **Filter & search** by category, username, bio
+- **Live scan log** via SSE — watch hits come in real-time
+- **Export** filtered username lists as `.txt` per category
+- Deploys to **Render** in one click
 
 ## Hit Criteria
 
@@ -9,96 +24,52 @@ Builds a growing SQLite database of Crypto Twitter accounts by searching Twitter
 | `followersCount` | ≥ 3,000 |
 | `viewCount` (tweet views) | ≥ 10,000 |
 
-Any account meeting **either** condition is stored.
+## Deploy on Render
 
-## Setup
+1. Push this repo to GitHub
+2. Create a new **Web Service** on [render.com](https://render.com)
+   - Build command: `npm install && npm run build`
+   - Start command: `npm start`
+3. Add environment variable: `RETTIWT_API_KEY`
+4. (Optional) Add a **Persistent Disk** mounted at `/data` and set `DB_PATH=/data/ctscan.db`
+   so your database survives redeploys
 
-### 1. Prerequisites
+Or use the included `render.yaml` for automatic setup.
 
-- Node.js 22+
-- A Twitter/X account
-
-### 2. Install dependencies
+## Local Setup
 
 ```bash
 npm install
-```
-
-### 3. Get your Rettiwt API key
-
-1. Install the **X Auth Helper** extension:
-   - Chrome: search "X Auth Helper" on the Chrome Web Store
-2. Open Twitter in **incognito mode** and log in
-3. Click the extension icon → **Generate API Key**
-4. Copy the base64 string
-
-```bash
 cp .env.example .env
-# Paste your key as RETTIWT_API_KEY in .env
+# Fill in RETTIWT_API_KEY
+
+npm run dev    # starts server at http://localhost:3000
 ```
 
-### 4. Run
+### Get your Rettiwt API key
 
-```bash
-# Full scan (35 queries × 5 pages = up to 17,500 tweets checked)
-npx ts-node src/main.ts scan
+1. Install **X Auth Helper** on Chrome (search Chrome Web Store)
+2. Open Twitter in **incognito mode** and log in
+3. Click the extension → **Generate API Key**
+4. Copy the base64 string → paste into `.env`
 
-# Deeper scan (~35,000 tweets)
-npx ts-node src/main.ts scan --pages 20
+## API Endpoints
 
-# View stats
-npx ts-node src/main.ts stats
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | Web dashboard |
+| GET | `/api/stats` | DB stats + category counts |
+| GET | `/api/accounts` | Paginated list (params: `category`, `search`, `sort`, `page`) |
+| POST | `/api/scan` | Start a background scan (body: `{ pages: 5 }`) |
+| GET | `/api/scan/status` | Current scan state |
+| GET | `/api/scan/events` | SSE stream of live log output |
+| GET | `/api/export?category=memecoin_kol` | Download username list as `.txt` |
 
-# Export usernames (one per line)
-npx ts-node src/main.ts export
-npx ts-node src/main.ts export --out my_ct_list.txt
-```
+## Important: Persistent Storage on Render
 
-## How it works
+Render's free tier has an **ephemeral filesystem** — your SQLite DB resets on each deploy.
+To keep your data, add a Persistent Disk:
 
-```
-config.ts         35 search queries (bitcoin, defi, web3, solana, nft, …)
-    ↓
-scraper.ts        Rettiwt tweet.search() with pagination
-    ↓  checks tweet.viewCount and tweet.tweetBy.followersCount
-database.ts       SQLite — accounts, tweets, queries tables
-    ↓
-main.ts           CLI: scan | stats | export
-```
-
-## Database schema
-
-**accounts** — one row per unique username
-- `username`, `user_id`, `display_name`
-- `followers`, `following`, `tweet_count`, `verified`
-- `hit_reason`: `followers` | `views` | `both`
-- `max_views`, `first_seen`, `last_updated`
-
-**tweets** — qualifying tweet records
-- `tweet_id`, `username`, `text`
-- `views`, `likes`, `retweets`, `replies`
-
-**queries** — audit log (label, ran_at, tweets_fetched, hits_found)
-
-## Configuration (`.env`)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `RETTIWT_API_KEY` | — | **Required** |
-| `MIN_FOLLOWERS` | `3000` | Follower threshold |
-| `MIN_VIEWS` | `10000` | View/impression threshold |
-| `DB_PATH` | `ctscan.db` | SQLite file path |
-| `PAGE_SIZE` | `100` | Tweets per request (max 100) |
-| `MAX_PAGES` | `5` | Pages per query |
-| `REQUEST_DELAY_MS` | `1500` | Delay between requests |
-
-## Output
-
-```
-─── Query 1/35: bitcoin ────────────────────────────
-  [NEW] @SatoshiSpirit           followers=  82,341  views=  234,100  reason=both
-  [NEW] @CryptoAnalystPro        followers=   4,210  views=   12,500  reason=both
-  [UPD] @BitcoinMagazine         followers= 891,000  views=  450,000  reason=both
-  page=1/5  fetched=100  hits=34
-  ── done: total fetched=500  total hits=178
-```
+1. Render dashboard → your service → **Disks**
+2. Add disk: mount path `/data`, size 1 GB ($0.25/mo)
+3. Set env var `DB_PATH=/data/ctscan.db`

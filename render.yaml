@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: ctscan
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      # Set these in Render dashboard → Environment:
+      - key: RETTIWT_API_KEY
+        sync: false
+      - key: MIN_FOLLOWERS
+        value: "3000"
+      - key: MIN_VIEWS
+        value: "10000"
+      - key: PAGE_SIZE
+        value: "100"
+      - key: MAX_PAGES
+        value: "5"
+      - key: REQUEST_DELAY_MS
+        value: "1500"
+      # For persistent SQLite, mount a disk:
+      - key: DB_PATH
+        value: /data/ctscan.db
+
+    # Uncomment to add a persistent disk ($0.25/GB/mo) so your DB survives deploys:
+    # disk:
+    #   name: ctscan-data
+    #   mountPath: /data
+    #   sizeGB: 1
