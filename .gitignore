@@ -3,9 +3,6 @@
 *.db-wal
 *.db-shm
 usernames*.txt
-__pycache__/
-*.py[cod]
-.venv/
-venv/
+node_modules/
 dist/
-*.egg-info/
+*.js.map

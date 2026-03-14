@@ -1,61 +1,69 @@
 # CTSCAN — Crypto Twitter Account Scanner
 
-Builds a SQLite database of Crypto Twitter accounts by searching the Twitter/X API v2.
+Builds a growing SQLite database of Crypto Twitter accounts by searching Twitter/X using **[Rettiwt-API](https://github.com/Rishikant181/Rettiwt-API)** — no official Twitter API key required.
 
 ## Hit Criteria
 
 | Signal | Threshold |
 |--------|-----------|
-| Account followers | ≥ 3,000 |
-| Tweet impressions | ≥ 10,000 |
+| `followersCount` | ≥ 3,000 |
+| `viewCount` (tweet views) | ≥ 10,000 |
 
-Any account that meets **either** condition is stored.
+Any account meeting **either** condition is stored.
 
 ## Setup
 
-### 1. Install dependencies
+### 1. Prerequisites
+
+- Node.js 22+
+- A Twitter/X account
+
+### 2. Install dependencies
+
 ```bash
-pip install -r requirements.txt
+npm install
 ```
 
-### 2. Twitter API credentials
-Create a project + app at [developer.twitter.com](https://developer.twitter.com/en/portal/dashboard).
-The **Free tier** gives you search access (1 req / 15 min).
-The **Basic tier** ($100/mo) gives 60 req / 15 min — recommended for bulk scanning.
+### 3. Get your Rettiwt API key
+
+1. Install the **X Auth Helper** extension:
+   - Chrome: search "X Auth Helper" on the Chrome Web Store
+2. Open Twitter in **incognito mode** and log in
+3. Click the extension icon → **Generate API Key**
+4. Copy the base64 string
 
 ```bash
 cp .env.example .env
-# Edit .env and set TWITTER_BEARER_TOKEN (minimum required)
+# Paste your key as RETTIWT_API_KEY in .env
 ```
 
-### 3. Run a scan
-```bash
-python main.py scan              # full scan, 5 pages per query (~17k tweets)
-python main.py scan --pages 10   # deeper scan (~34k tweets)
-python main.py scan --verbose    # show debug output
-```
+### 4. Run
 
-### 4. View stats
 ```bash
-python main.py stats
-```
+# Full scan (35 queries × 5 pages = up to 17,500 tweets checked)
+npx ts-node src/main.ts scan
 
-### 5. Export usernames
-```bash
-python main.py export                     # → usernames.txt
-python main.py export --out ct_list.txt   # custom filename
+# Deeper scan (~35,000 tweets)
+npx ts-node src/main.ts scan --pages 20
+
+# View stats
+npx ts-node src/main.ts stats
+
+# Export usernames (one per line)
+npx ts-node src/main.ts export
+npx ts-node src/main.ts export --out my_ct_list.txt
 ```
 
 ## How it works
 
 ```
-config.py          35+ crypto search queries (bitcoin, defi, web3, etc.)
+config.ts         35 search queries (bitcoin, defi, web3, solana, nft, …)
     ↓
-scraper.py         Twitter API v2 search_recent_tweets, paginated
-    ↓  evaluates follower count + impression count per tweet
-database.py        SQLite — accounts, tweets, queries tables
+scraper.ts        Rettiwt tweet.search() with pagination
+    ↓  checks tweet.viewCount and tweet.tweetBy.followersCount
+database.ts       SQLite — accounts, tweets, queries tables
     ↓
-main.py            CLI: scan | stats | export
+main.ts           CLI: scan | stats | export
 ```
 
 ## Database schema
@@ -63,33 +71,34 @@ main.py            CLI: scan | stats | export
 **accounts** — one row per unique username
 - `username`, `user_id`, `display_name`
 - `followers`, `following`, `tweet_count`, `verified`
-- `hit_reason` (`followers` | `impressions` | `both`)
-- `max_impressions`, `first_seen`, `last_updated`
+- `hit_reason`: `followers` | `views` | `both`
+- `max_views`, `first_seen`, `last_updated`
 
-**tweets** — qualifying tweets that triggered a hit
+**tweets** — qualifying tweet records
 - `tweet_id`, `username`, `text`
-- `impressions`, `likes`, `retweets`, `replies`
+- `views`, `likes`, `retweets`, `replies`
 
-**queries** — audit log of every API call
+**queries** — audit log (label, ran_at, tweets_fetched, hits_found)
 
-## Rate limits
-
-| Tier | Requests | Tweets/month |
-|------|----------|--------------|
-| Free | 1 req / 15 min | 10k |
-| Basic | 60 req / 15 min | 100k |
-
-The scraper uses `wait_on_rate_limit=True` — it will sleep automatically when limits are hit.
-
-## Configuration
-
-All settings via `.env` (see `.env.example`):
+## Configuration (`.env`)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TWITTER_BEARER_TOKEN` | — | **Required** |
-| `MIN_FOLLOWERS` | 3000 | Follower threshold |
-| `MIN_IMPRESSIONS` | 10000 | Impression threshold |
-| `DB_PATH` | `ctscan.db` | SQLite file |
-| `MAX_RESULTS_PER_QUERY` | 100 | Tweets per API call (10–100) |
-| `REQUEST_DELAY` | 1.0 | Seconds between requests |
+| `RETTIWT_API_KEY` | — | **Required** |
+| `MIN_FOLLOWERS` | `3000` | Follower threshold |
+| `MIN_VIEWS` | `10000` | View/impression threshold |
+| `DB_PATH` | `ctscan.db` | SQLite file path |
+| `PAGE_SIZE` | `100` | Tweets per request (max 100) |
+| `MAX_PAGES` | `5` | Pages per query |
+| `REQUEST_DELAY_MS` | `1500` | Delay between requests |
+
+## Output
+
+```
+─── Query 1/35: bitcoin ────────────────────────────
+  [NEW] @SatoshiSpirit           followers=  82,341  views=  234,100  reason=both
+  [NEW] @CryptoAnalystPro        followers=   4,210  views=   12,500  reason=both
+  [UPD] @BitcoinMagazine         followers= 891,000  views=  450,000  reason=both
+  page=1/5  fetched=100  hits=34
+  ── done: total fetched=500  total hits=178
+```

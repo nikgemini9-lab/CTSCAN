@@ -1,0 +1,24 @@
+{
+  "name": "ctscan",
+  "version": "1.0.0",
+  "description": "Crypto Twitter account scanner using Rettiwt-API",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "scan": "ts-node src/main.ts scan",
+    "stats": "ts-node src/main.ts stats",
+    "export": "ts-node src/main.ts export",
+    "start": "ts-node src/main.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.3",
+    "dotenv": "^16.4.5",
+    "rettiwt-api": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/node": "^20.11.30",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.3"
+  }
+}
